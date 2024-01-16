@@ -12,12 +12,22 @@ import java.util.Map;
 	isPublishVersion = true
 )
 public class HelloWorld implements RequestHandler<Object, Map<String, Object>> {
+	private static final int SC_OK = 200;
+    private static final int SC_BAD_REQUEST = 400;
+    private final Gson gson = new Gson();
 
-	public Map<String, Object> handleRequest(Object request, Context context) {
-		System.out.println("Hello from lambda");
-		Map<String, Object> resultMap = new HashMap<String, Object>();
-		resultMap.put("statusCode", 200);
-		resultMap.put("body", "Hello from Lambda");
-		return resultMap;
-	}
+    @Override
+    public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent apiGatewayProxyRequestEvent, Context context) {
+        context.getLogger().log(apiGatewayProxyRequestEvent.toString());
+        Map<String, String> queryStringParameters = apiGatewayProxyRequestEvent.getQueryStringParameters();
+        try {
+            return new APIGatewayProxyResponseEvent()
+                    .withStatusCode(SC_OK)
+                    .withBody(gson.toJson("Hello from Lambda"));
+        } catch (IllegalArgumentException exception) {
+            return new APIGatewayProxyResponseEvent()
+                    .withStatusCode(SC_BAD_REQUEST)
+                    .withBody(gson.toJson(exception.getMessage()));
+        }
+    }
 }
