@@ -18,6 +18,14 @@
           ],
           "Effect": "Allow",
           "Resource": "*"
+        },
+ 	{
+          "Action": [
+            "apigateway:*"
+
+          ],
+          "Effect": "Allow",
+          "Resource": "*"
         }
       ],
       "Version": "2012-10-17"
