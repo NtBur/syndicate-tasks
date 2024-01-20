@@ -18,14 +18,6 @@
           ],
           "Effect": "Allow",
           "Resource": "*"
-        },
- 	{
-          "Action": [
-            "apigateway:*"
-
-          ],
-          "Effect": "Allow",
-          "Resource": "*"
         }
       ],
       "Version": "2012-10-17"
@@ -33,7 +25,7 @@
     "resource_type": "iam_policy"
   },
   "hello_world-role": {
-    "predefined_policies": [],
+    "predefined_policies": ["AWSLambda_FullAccess"],
     "principal_service": "lambda",
     "custom_policies": [
       "lambda-basic-execution"
@@ -52,12 +44,17 @@
         "enable_cors": false,
         "GET": {
           "authorization_type": "NONE",
-          "integration_type": "mock",
+          "integration_type": "lambda",
           "lambda_name": "hello_world",
           "api_key_required": false,
           "method_request_parameters": {},
           "integration_request_body_template": {},
-          "responses": [],
+          "responses": [{
+           "statusCode": 200,
+	   "response_parameters":{
+           "message": "Hello from Lambda"
+	}
+       }],
           "integration_responses": [],
           "default_error_pattern": true
         }
