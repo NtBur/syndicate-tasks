@@ -1,5 +1,5 @@
 .syndicate
 logs/
-.syndicate-config-courseAWS
-target
 .idea
+target
+.syndicate-config-courseAWS

@@ -15,7 +15,10 @@
             "ssm:PutParameter",
             "ssm:GetParameter",
             "kms:Decrypt",
-	    "sqs:*"
+	    "sqs:SendMessage",
+            "sqs:ReceiveMessage",
+            "sqs:DeleteMessage",
+            "sqs:GetQueueAttributes"
           ],
           "Effect": "Allow",
           "Resource": "*"
@@ -26,11 +29,18 @@
     "resource_type": "iam_policy"
   },
   "sqs_handler-role": {
-    "predefined_policies": [
-      "AWSLambda_FullAccess",
-      "AmazonSQSFullAccess",
-      "AWSLambdaSQSQueueExecutionRole"
+    "predefined_policies": [],
+    "principal_service": "lambda",
+    "custom_policies": [
+      "lambda-basic-execution"
     ],
+    "resource_type": "iam_role",
+    "allowed_accounts": [
+      "${account_id}"
+    ]
+  },
+  "sns_handler-role": {
+    "predefined_policies": [],
     "principal_service": "lambda",
     "custom_policies": [
       "lambda-basic-execution"
@@ -43,7 +53,7 @@
   "async_queue": {
     "resource_type": "sqs_queue",
     "fifo_queue": false,
-    "visibility_timeout": 30,
+    "visibility_timeout": 300,
     "delay_seconds": 0,
     "maximum_message_size": 1024,
     "message_retention_period": 60,
@@ -52,18 +62,7 @@
     "redrive_policy": {},
     "content_based_deduplication": false
   },
-  "sns_handler-role": {
-    "predefined_policies": ["AmazonSNSFullAccess"],
-    "principal_service": "lambda",
-    "custom_policies": [
-      "lambda-basic-execution"
-    ],
-    "resource_type": "iam_role",
-    "allowed_accounts": [
-      "${account_id}"
-    ]
-  },
-  "Lambda_topic": {
+  "lambda_topic": {
     "resource_type": "sns_topic",
     "region": "eu-central-1",
     "event_sources": []

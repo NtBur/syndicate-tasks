@@ -8,10 +8,10 @@ import com.syndicate.deployment.annotations.lambda.LambdaHandler;
 import java.util.HashMap;
 import java.util.Map;
 
-@SnsEventSource(targetTopic = "Lambda_topic")
 @LambdaHandler(lambdaName = "sns_handler",
 	roleName = "sns_handler-role"
 )
+@SnsEventSource(targetTopic = "lambda_topic")
 public class SnsHandler implements RequestHandler<Object, Map<String, Object>> {
 
 	public Map<String, Object> handleRequest(Object request, Context context) {
