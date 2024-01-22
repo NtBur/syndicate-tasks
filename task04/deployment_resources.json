@@ -14,7 +14,8 @@
             "dynamodb:DeleteItem",
             "ssm:PutParameter",
             "ssm:GetParameter",
-            "kms:Decrypt"
+            "kms:Decrypt",
+	    "sqs:*"
           ],
           "Effect": "Allow",
           "Resource": "*"
@@ -27,7 +28,8 @@
   "sqs_handler-role": {
     "predefined_policies": [
       "AWSLambda_FullAccess",
-      "AmazonSQSFullAccess"
+      "AmazonSQSFullAccess",
+      "AWSLambdaSQSQueueExecutionRole"
     ],
     "principal_service": "lambda",
     "custom_policies": [
