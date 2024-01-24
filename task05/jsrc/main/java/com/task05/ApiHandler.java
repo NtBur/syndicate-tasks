@@ -14,7 +14,7 @@ import com.syndicate.deployment.model.lambda.url.AuthType;
 import com.syndicate.deployment.model.lambda.url.InvokeMode;
 import com.task05.request.EventRequest;
 
-import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.util.*;
 
 @LambdaHandler(lambdaName = "api_handler",
@@ -35,8 +35,8 @@ public class ApiHandler implements RequestHandler<EventRequest, Map<String, Obje
 		this.initDynamoDbClient();
 
 		Map<String, Object> response = new HashMap<String, Object>();
+		response.put("event", persistData(request));
 		response.put("statusCode", 201);
-		response.put("body", persistData(request));
 		return response;
 	}
 
@@ -44,12 +44,9 @@ public class ApiHandler implements RequestHandler<EventRequest, Map<String, Obje
 
 		Map<String, AttributeValue> attributesMap = new HashMap<>();
 
-		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
-		format.setTimeZone(TimeZone.getTimeZone("UTC"));
-
 		attributesMap.put("id", new AttributeValue(String.valueOf(UUID.randomUUID())));
 		attributesMap.put("principalId", new AttributeValue(String.valueOf(request.getPrincipalId())));
-		attributesMap.put("createdAt", new AttributeValue(format.toString()));
+		attributesMap.put("createdAt", new AttributeValue(String.valueOf(Instant.now())));
 		attributesMap.put("body", new AttributeValue(String.valueOf(request.getContent())));
 
 		amazonDynamoDB.putItem(System.getenv("target_table"), attributesMap);

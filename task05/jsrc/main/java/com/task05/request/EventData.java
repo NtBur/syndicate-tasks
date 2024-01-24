@@ -1,18 +1,20 @@
 package com.task05.request;
 
+import java.rmi.server.UID;
 import java.util.Map;
+import java.util.UUID;
 
 public class EventData {
-    private int id;
+    private UUID id;
     private int principalId;
     private String createdAt;
     private Map<String, String>  body;
 
-    public int getId() {
+    public UUID getId() {
         return id;
     }
 
-    public void setId(int id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 
