@@ -45,7 +45,7 @@ public class ApiHandler implements RequestHandler<EventRequest, Map<String, Obje
 		Map<String, AttributeValue> attributesMap = new HashMap<>();
 
 		attributesMap.put("id", new AttributeValue(String.valueOf(UUID.randomUUID())));
-		attributesMap.put("principalId", new AttributeValue().withN(String.valueOf(request.getPrincipalId())));
+		attributesMap.put("principalId", new AttributeValue().withN(Integer.toString(request.getPrincipalId())));
 		attributesMap.put("createdAt", new AttributeValue(String.valueOf(Instant.now())));
 		attributesMap.put("body", new AttributeValue(String.valueOf(request.getContent())));
 
