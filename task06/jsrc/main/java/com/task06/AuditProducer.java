@@ -48,11 +48,11 @@ public class AuditProducer implements RequestHandler<DynamodbEvent, Void> {
         Map<String, com.amazonaws.services.lambda.runtime.events.models.dynamodb.AttributeValue> newTable = record.getDynamodb().getNewImage();
 
         attributesMap.put("id", new AttributeValue(String.valueOf(UUID.randomUUID())));
-        attributesMap.put("itemKey", new AttributeValue(String.valueOf(newTable.get("key"))));
+        attributesMap.put("itemKey", new AttributeValue(String.valueOf(newTable.get("key").getS())));
         attributesMap.put("modificationTime", new AttributeValue(String.valueOf(Instant.now())));
         Map<String, AttributeValue> newValues = new HashMap<>();
-        newValues.put("key", new AttributeValue(String.valueOf(newTable.get("key"))));
-        newValues.put("value", new AttributeValue(String.valueOf(newTable.get("value"))));
+        newValues.put("key", new AttributeValue(String.valueOf(newTable.get("key").getS())));
+        newValues.put("value", new AttributeValue(String.valueOf(newTable.get("value").getS())));
         attributesMap.put("newValue", new AttributeValue().withM(newValues));
 
         amazonDynamoDB.putItem(System.getenv("target_table"), attributesMap);
@@ -65,12 +65,12 @@ public class AuditProducer implements RequestHandler<DynamodbEvent, Void> {
         Map<String, com.amazonaws.services.lambda.runtime.events.models.dynamodb.AttributeValue> newTable = record.getDynamodb().getNewImage();
 
         attributesMap.put("id", new AttributeValue(String.valueOf(UUID.randomUUID())));
-        attributesMap.put("itemKey", new AttributeValue(String.valueOf(newTable.get("key"))));
+        attributesMap.put("itemKey", new AttributeValue(String.valueOf(newTable.get("key").getS())));
         attributesMap.put("modificationTime", new AttributeValue(String.valueOf(Instant.now())));
 
         attributesMap.put("updatedAttribute", new AttributeValue("value"));
-        attributesMap.put("oldValue", new AttributeValue(String.valueOf(oldTable.get("value"))));
-        attributesMap.put("newValue", new AttributeValue(String.valueOf(newTable.get("value"))));
+        attributesMap.put("oldValue", new AttributeValue(String.valueOf(oldTable.get("value").getS())));
+        attributesMap.put("newValue", new AttributeValue(String.valueOf(newTable.get("value").getS())));
 
         amazonDynamoDB.putItem(System.getenv("target_table"), attributesMap);
         return attributesMap;
