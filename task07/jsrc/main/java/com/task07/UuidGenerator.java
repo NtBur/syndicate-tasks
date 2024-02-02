@@ -41,7 +41,7 @@ public class UuidGenerator implements RequestHandler<Void, Void> {
 		String jsonString = jsonObject.toString();
 
 		Instant startTime = Instant.now();
-		String fileName = startTime.toString() + ".txt";
+		String fileName = startTime.toString();
 		InputStream inputStream = new ByteArrayInputStream(jsonString.toString().getBytes(StandardCharsets.UTF_8));
 		ObjectMetadata metadata = new ObjectMetadata();
 		metadata.setContentLength(jsonString.length());
