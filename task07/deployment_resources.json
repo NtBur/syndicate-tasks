@@ -47,21 +47,18 @@
       "${account_id}"
     ]
   },
-  "${target_bucket}": {
+"${target_bucket}": {
     "resource_type": "s3_bucket",
     "acl": "private",
     "cors": [],
-    "policy": {
-      "Version": "2012-10-17",
-      "Statement": []
-    },
+    "policy": {},
     "public_access_block": {
       "block_public_acls": true,
       "ignore_public_acls": true,
       "block_public_policy": true,
       "restrict_public_buckets": true
     }
-  },
+},
   "uuid_trigger": {
     "resource_type": "cloudwatch_rule",
     "rule_type": "schedule",
