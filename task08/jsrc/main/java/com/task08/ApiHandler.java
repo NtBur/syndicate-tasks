@@ -25,6 +25,7 @@ import java.util.Map;
 )
 @LambdaLayer(
 		layerName = "sdk-layer",
+		libraries = {"lib/commons-lang3-3.14.0.jar", "lib/gson-2.10.1.jar"},
 		runtime = DeploymentRuntime.JAVA8,
 		artifactExtension = ArtifactExtension.ZIP
 )
