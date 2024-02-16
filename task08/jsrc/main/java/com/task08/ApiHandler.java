@@ -41,7 +41,6 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
 	@Override
 	public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent apiGatewayProxyRequestEvent, Context context) {
 		context.getLogger().log(apiGatewayProxyRequestEvent.toString());
-		Map<String, String> queryStringParameters = apiGatewayProxyRequestEvent.getQueryStringParameters();
 		try {
 			return new APIGatewayProxyResponseEvent()
 					.withStatusCode(SC_OK)
