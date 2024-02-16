@@ -7,7 +7,7 @@ import java.net.URL;
 import org.json.JSONObject;
 
 public class WeatherMessage {
-    private final String BASE_URL = "http://api.open-meteo.com/v1/forecast?latitude=49.08&longitude=34.11&current=temperature_2m,wind_speed_10m&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m";
+    private final String BASE_URL = "http://api.open-meteo.com/v1/forecast?latitude=50.4375&longitude=30.5&hourly=temperature_2m";
 
 
     public String getWeather() {
