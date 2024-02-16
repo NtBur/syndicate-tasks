@@ -16,7 +16,6 @@ import com.task08.response.ErrorMessage;
 import com.task08.response.WeatherMessage;
 
 
-import java.util.Map;
 
 
 @LambdaHandler(lambdaName = "api_handler",
@@ -44,7 +43,7 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
 		try {
 			return new APIGatewayProxyResponseEvent()
 					.withStatusCode(SC_OK)
-					.withBody(new WeatherMessage().getWeather());
+					.withBody(gson.toJson(new WeatherMessage().getWeather()));
 		} catch (IllegalArgumentException exception) {
 			return new APIGatewayProxyResponseEvent()
 					.withStatusCode(SC_BAD_REQUEST)

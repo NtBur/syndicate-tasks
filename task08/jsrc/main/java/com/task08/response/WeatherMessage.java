@@ -4,11 +4,11 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import org.json.JSONObject;
+
 
 public class WeatherMessage {
     private final String BASE_URL = "https://api.open-meteo.com/v1/forecast?latitude=50.4547&longitude=30.5238&hourly=temperature_2m&timezone=Europe%2FKyiv";
-    public String getWeather() {
+    public StringBuffer getWeather() {
 
         StringBuffer response = null;
         try {
@@ -28,6 +28,6 @@ public class WeatherMessage {
             e.printStackTrace();
         }
         assert response != null;
-        return response.toString();
+        return response;
     }
 }
