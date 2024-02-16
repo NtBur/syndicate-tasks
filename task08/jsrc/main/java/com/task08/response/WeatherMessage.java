@@ -10,7 +10,7 @@ public class WeatherMessage {
     private final String BASE_URL = "http://api.open-meteo.com/v1/forecast?latitude=50.4375&longitude=30.5&hourly=temperature_2m";
 
 
-    public String getWeather() {
+    public JSONObject getWeather() {
 
         StringBuffer response = null;
         try {
@@ -30,6 +30,7 @@ public class WeatherMessage {
             e.printStackTrace();
         }
         assert response != null;
-        return response.toString();
+        JSONObject obj = new JSONObject(response.toString());
+        return obj;
     }
 }
