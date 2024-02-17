@@ -37,14 +37,13 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
 	private static final int SC_BAD_REQUEST = 400;
 	private final Gson gson = new Gson();
 
-	private final String BASE_URL = "https://api.open-meteo.com/v1/forecast?latitude=50.4547&longitude=30.5238&hourly=temperature_2m&timezone=Europe%2FKyiv";
 	@Override
 	public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent apiGatewayProxyRequestEvent, Context context) {
 		context.getLogger().log(apiGatewayProxyRequestEvent.toString());
 		try {
 			return new APIGatewayProxyResponseEvent()
 					.withStatusCode(SC_OK)
-					.withBody(!gson.toJson(BASE_URL).isEmpty()?new WeatherMessage().getWeather():null);
+					.withBody(gson!=null?new WeatherMessage().getWeather():null);
 		} catch (IllegalArgumentException exception) {
 			return new APIGatewayProxyResponseEvent()
 					.withStatusCode(SC_BAD_REQUEST)
