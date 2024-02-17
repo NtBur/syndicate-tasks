@@ -8,6 +8,7 @@ import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
+import com.amazonaws.xray.entities.Subsegment;
 import com.google.gson.Gson;
 import com.syndicate.deployment.annotations.LambdaUrlConfig;
 import com.syndicate.deployment.annotations.environment.EnvironmentVariable;
@@ -44,7 +45,7 @@ public class Processor implements RequestHandler<APIGatewayProxyRequestEvent, AP
 
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent apiGatewayProxyRequestEvent, Context context) {
-        AWSXRay.beginSegment("segment-name");
+        Subsegment subsegment = AWSXRay.beginSubsegment("handleRequest");
         try {
             context.getLogger().log(apiGatewayProxyRequestEvent.toString());
             this.initDynamoDbClient();
