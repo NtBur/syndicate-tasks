@@ -19,12 +19,13 @@ import com.syndicate.deployment.model.lambda.url.InvokeMode;
 import com.task09.request.ErrorMessage;
 import com.task09.request.WeatherMessage;
 import org.json.*;
+import com.amazonaws.xray.AWSXRay;
 
 import java.util.*;
 
 @LambdaHandler(lambdaName = "processor",
         roleName = "processor-role",
-		tracingMode = TracingMode.Active
+        tracingMode = TracingMode.Active
 )
 @LambdaUrlConfig(
         authType = AuthType.NONE,
@@ -43,21 +44,27 @@ public class Processor implements RequestHandler<APIGatewayProxyRequestEvent, AP
 
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent apiGatewayProxyRequestEvent, Context context) {
-        context.getLogger().log(apiGatewayProxyRequestEvent.toString());
-        this.initDynamoDbClient();
-        JSONObject jsonObj = new JSONObject();
-        String weatherJsonStr = new WeatherMessage().getWeather();
-        JSONObject weatherJsonObj = new JSONObject(weatherJsonStr);
-        jsonObj.put("forecast", weatherJsonObj);
-        persistData(jsonObj);
+        AWSXRay.beginSegment("segment-name");
         try {
-            return new APIGatewayProxyResponseEvent()
-                    .withStatusCode(SC_OK)
-                    .withBody(new WeatherMessage().getWeather());
-        } catch (IllegalArgumentException exception) {
-            return new APIGatewayProxyResponseEvent()
-                    .withStatusCode(SC_BAD_REQUEST)
-                    .withBody(gson.toJson(new ErrorMessage(exception.getMessage())));
+            context.getLogger().log(apiGatewayProxyRequestEvent.toString());
+            this.initDynamoDbClient();
+
+            JSONObject jsonObj = new JSONObject();
+            String weatherJsonStr = new WeatherMessage().getWeather();
+            JSONObject weatherJsonObj = new JSONObject(weatherJsonStr);
+            jsonObj.put("forecast", weatherJsonObj);
+            persistData(jsonObj);
+            try {
+                return new APIGatewayProxyResponseEvent()
+                        .withStatusCode(SC_OK)
+                        .withBody(new WeatherMessage().getWeather());
+            } catch (IllegalArgumentException exception) {
+                return new APIGatewayProxyResponseEvent()
+                        .withStatusCode(SC_BAD_REQUEST)
+                        .withBody(gson.toJson(new ErrorMessage(exception.getMessage())));
+            }
+        } finally {
+            AWSXRay.endSegment();
         }
     }
 
@@ -70,15 +77,14 @@ public class Processor implements RequestHandler<APIGatewayProxyRequestEvent, AP
 
         item.put("id", new AttributeValue(UUID.randomUUID().toString()));
 
-        item.put("forecast.elevation", new AttributeValue().withN(String.valueOf(forecast.getDouble("elevation"))));
-        item.put("forecast.generationtime_ms", new AttributeValue().withN(String.valueOf(forecast.getDouble("generationtime_ms"))));
-
-        item.put("latitude", new AttributeValue().withN(String.valueOf(forecast.getDouble("latitude"))));
-        item.put("longitude", new AttributeValue().withN(String.valueOf(forecast.getDouble("longitude"))));
-
-        item.put("timezone", new AttributeValue(forecast.getString("timezone")));
-        item.put("timezone_abbreviation", new AttributeValue(forecast.getString("timezone_abbreviation")));
-        item.put("utc_offset_seconds", new AttributeValue().withN(String.valueOf(forecast.getDouble("utc_offset_seconds"))));
+        Map<String, AttributeValue> forecastItem = new HashMap<>();
+        forecastItem.put("elevation", new AttributeValue().withN(String.valueOf(forecast.getDouble("elevation"))));
+        forecastItem.put("generationtime_ms", new AttributeValue().withN(String.valueOf(forecast.getDouble("generationtime_ms"))));
+        forecastItem.put("latitude", new AttributeValue().withN(String.valueOf(forecast.getDouble("latitude"))));
+        forecastItem.put("longitude", new AttributeValue().withN(String.valueOf(forecast.getDouble("longitude"))));
+        forecastItem.put("timezone", new AttributeValue(forecast.getString("timezone")));
+        forecastItem.put("timezone_abbreviation", new AttributeValue(forecast.getString("timezone_abbreviation")));
+        forecastItem.put("utc_offset_seconds", new AttributeValue().withN(String.valueOf(forecast.getDouble("utc_offset_seconds"))));
 
         JSONArray temperature_2m = hourly.getJSONArray("temperature_2m");
         List<AttributeValue> temp2mList = new ArrayList<>();
@@ -92,11 +98,19 @@ public class Processor implements RequestHandler<APIGatewayProxyRequestEvent, AP
             timeList.add(new AttributeValue().withS(time.getString(i)));
         }
 
-        item.put("hourly_temperature_2m", new AttributeValue().withL(temp2mList));
-        item.put("hourly_time", new AttributeValue().withL(timeList));
+        Map<String, AttributeValue> hourlyItem = new HashMap<>();
+        hourlyItem.put("temperature_2m", new AttributeValue().withL(temp2mList));
+        hourlyItem.put("time", new AttributeValue().withL(timeList));
 
-        item.put("hourly_units_temperature_2m", new AttributeValue(hourly_units.getString("temperature_2m")));
-        item.put("hourly_units_time", new AttributeValue(hourly_units.getString("time")));
+        forecastItem.put("hourly", new AttributeValue().withM(hourlyItem));
+
+        Map<String, AttributeValue> hourlyUnitsItem = new HashMap<>();
+        hourlyUnitsItem.put("temperature_2m", new AttributeValue(hourly_units.getString("temperature_2m")));
+        hourlyUnitsItem.put("time", new AttributeValue(hourly_units.getString("time")));
+
+        forecastItem.put("hourly_units", new AttributeValue().withM(hourlyUnitsItem));
+
+        item.put("forecast", new AttributeValue().withM(forecastItem));
 
         amazonDynamoDB.putItem(System.getenv("target_table"), item);
         return item;
@@ -104,8 +118,8 @@ public class Processor implements RequestHandler<APIGatewayProxyRequestEvent, AP
 
     private static List<String> toList(JSONArray jsonArray) {
         List<String> list = new ArrayList<>();
-        for (int i=0; i<jsonArray.length(); i++) {
-            list.add( jsonArray.getString(i) );
+        for (int i = 0; i < jsonArray.length(); i++) {
+            list.add(jsonArray.getString(i));
         }
         return list;
 
