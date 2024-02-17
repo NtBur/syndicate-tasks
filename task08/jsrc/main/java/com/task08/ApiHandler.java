@@ -43,7 +43,7 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
 		context.getLogger().log(apiGatewayProxyRequestEvent.toString());
 		String url = gson.toJson(BASE_URL);
 		try {
-			return (url!=null)?new APIGatewayProxyResponseEvent()
+			return (!url.equals(""))?new APIGatewayProxyResponseEvent()
 					.withStatusCode(SC_OK)
 					.withBody(new WeatherMessage().getWeather()):null;
 		} catch (IllegalArgumentException exception) {
