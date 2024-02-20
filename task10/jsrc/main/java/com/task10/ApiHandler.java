@@ -58,11 +58,16 @@ public class ApiHandler implements  RequestHandler<APIGatewayProxyRequestEvent, 
 								AttributeType.builder().name("family_name").value(lastName).build(),
 								AttributeType.builder().name("email").value(email).build()
 						)
-
 						.temporaryPassword("TempPassword1!")
 						.build();
-
 				try {
+					AdminCreateUserResponse signUpResponse = cognitoClient.adminCreateUser(signUpRequest);
+					return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody("User registered successfully");
+				} catch (UsernameExistsException e) {
+					return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Username already exists");
+				} catch (CognitoIdentityProviderException e) {
+					return new APIGatewayProxyResponseEvent().withStatusCode(e.statusCode()).withBody(e.awsErrorDetails().errorMessage());
+			/*	try {
 					AdminCreateUserResponse response = cognitoClient.adminCreateUser(signUpRequest);
 					if(response.sdkHttpResponse().isSuccessful()) {
 						// If user creation is successful, set the real (given) password
@@ -80,7 +85,7 @@ public class ApiHandler implements  RequestHandler<APIGatewayProxyRequestEvent, 
 						}
 					}
 				} catch (Exception ex) {
-					return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody(ex.getMessage());
+					return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody(ex.getMessage());*/
 				}
 			} else if ("/signin".equals(event.getResource()) && "POST".equals(event.getHttpMethod())) {
 
@@ -105,8 +110,8 @@ public class ApiHandler implements  RequestHandler<APIGatewayProxyRequestEvent, 
 				}
 			}
 			return new APIGatewayProxyResponseEvent()
-					.withStatusCode(400)
-					.withBody("Invalid resource or method.");
+					.withStatusCode(200)
+					.withBody("Valid resource or method.");
 		}
 
 	private String getClientId(CognitoIdentityProviderClient cognitoClient) {
