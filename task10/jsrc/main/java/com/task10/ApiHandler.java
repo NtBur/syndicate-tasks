@@ -14,6 +14,7 @@ import com.syndicate.deployment.annotations.environment.EnvironmentVariables;
 import com.syndicate.deployment.annotations.lambda.LambdaHandler;
 import com.syndicate.deployment.model.lambda.url.AuthType;
 import com.syndicate.deployment.model.lambda.url.InvokeMode;
+
 import software.amazon.awssdk.core.Response;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityProviderClient;
@@ -25,6 +26,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @LambdaHandler(lambdaName = "api_handler",
         roleName = "api_handler-role"
@@ -84,16 +87,17 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         Map<String, String> input = gson.fromJson(inputBody.getBody(), new TypeToken<Map<String, String>>() {
         }.getType());
-
+        String validEmail = validateEmail(input.get("email"))?input.get("email"):null;
+        String validPassword = validatePassword(input.get("password"))?input.get("password"):null;
         AdminCreateUserRequest adminCreateUserRequest = AdminCreateUserRequest.builder()
                 .userPoolId(userPoolId)
                 .messageAction("SUPPRESS")
-                .username(input.get("email"))
-                .temporaryPassword(input.get("password"))
+                .username(validEmail)
+                .temporaryPassword(validPassword)
                 .userAttributes(
                         AttributeType.builder().name("name").value(input.get("firstName")).build(),
                         AttributeType.builder().name("family_name").value(input.get("lastName")).build(),
-                        AttributeType.builder().name("email").value(input.get("email")).build()
+                        AttributeType.builder().name("email").value(validEmail).build()
                 )
                 .build();
 
@@ -102,7 +106,25 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
             return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody("User registered successfully");
         } catch (UsernameExistsException e) {
             return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Username already exists");
+        }catch (InvalidParameterException e){
+            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid parameter");
         }
+    }
+
+    public boolean validateEmail(String email) {
+        Pattern pattern;
+        Matcher matcher;
+
+        String EMAIL_PATTERN = "^[A-Za-z0-9+_.-]+@(.+)$";
+        pattern = Pattern.compile(EMAIL_PATTERN);
+        matcher = pattern.matcher(email);
+        return matcher.matches();
+    }
+
+    public boolean validatePassword(String password) {
+        String PASSWORD_PATTERN = "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[$%^*])[A-Za-z\\d$%^*]{12,}$";
+        Pattern pattern = Pattern.compile(PASSWORD_PATTERN);
+        return pattern.matcher(password).matches();
     }
 		/*	Gson gson = new GsonBuilder().setPrettyPrinting().create();
 			Map<String, String> requestBody = gson.fromJson(inputBody.getBody(), new TypeToken<Map<String, String>>() {}.getType());
@@ -166,8 +188,29 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
                             .authParameters(buildAuthParameters(input.get("email"), input.get("password")))
                             .build()
             );
-            System.out.println("TOKEN " + authResponse.authenticationResult().idToken());
-            return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody("{\"accessToken\":\"" + authResponse.authenticationResult().idToken() + "\"}");
+
+                    String challengeName = authResponse.challengeNameAsString();
+                    String token = null;
+                    if (ChallengeNameType.NEW_PASSWORD_REQUIRED.name().equals(challengeName)) {
+                        RespondToAuthChallengeResponse respondToAuthChallenge = cognitoClient.respondToAuthChallenge(
+                                RespondToAuthChallengeRequest.builder()
+                                        .challengeName(ChallengeNameType.NEW_PASSWORD_REQUIRED)
+                                        .clientId(clientId)
+                                        .challengeResponses(new HashMap() {
+                                            {
+                                                put("USERNAME", input.get("email"));
+                                                put("NEW_PASSWORD",  input.get("password"));
+                                            }
+                                        })
+                                        .session(authResponse.session())
+                                        .build()
+                        );
+                        token = respondToAuthChallenge.authenticationResult().idToken();
+                    }
+
+
+            System.out.println("TOKEN " + token);
+            return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody("{\"accessToken\":\"" + token + "\"}");
         } catch (Exception e) {
             return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Auth failed: " + e.getMessage());
         }
