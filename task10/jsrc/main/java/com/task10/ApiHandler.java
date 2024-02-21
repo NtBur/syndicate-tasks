@@ -44,7 +44,12 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
 	private CognitoIdentityProviderClient cognitoClient = CognitoIdentityProviderClient.builder()
 			.region(Region.of(System.getenv("region")))
 			.build();
+	CognitoClient client = new CognitoClient();
+	private String userPoolId = client.getUserPoolId(cognitoClient, System.getenv("booking_userpool"));
+	private String clientId = client.getClientId(cognitoClient, userPoolId);
+
 		public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent input, Context context) {
+			if(clientId!=null){
 			String path = input.getPath();
 
 			switch (path) {
@@ -61,7 +66,8 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
 					}
 					break;
 				case "/tables/{tableId}":
-				//	return handleGetTable(input);
+					//	return handleGetTable(input);
+			}
 			}
 			return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid request");
 		}
@@ -71,7 +77,7 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
 			Map<String, String> input = gson.fromJson(inputBody.getBody(), new TypeToken<Map<String, String>>() {}.getType());
 
 					AdminCreateUserRequest adminCreateUserRequest = AdminCreateUserRequest.builder()
-							.userPoolId(System.getenv("booking_userpool"))
+							.userPoolId(userPoolId)
 							.messageAction("SUPPRESS")
 							.username(input.get("email"))
 							.temporaryPassword(input.get("password"))
@@ -97,7 +103,7 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
 			Map<String, String> input = gson.fromJson(inputBody.getBody(), new TypeToken<Map<String, String>>() {}.getType());
 			InitiateAuthRequest authRequest = InitiateAuthRequest.builder()
 					.authFlow(AuthFlowType.USER_PASSWORD_AUTH)
-					.clientId("clientId")
+					.clientId(clientId)
 					.authParameters(buildAuthParameters(input.get("email"), input.get("password")))
 					.build();
 
@@ -119,18 +125,6 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
 
 
 		private APIGatewayProxyResponseEvent handleGetTables(APIGatewayProxyRequestEvent input) {
-			String accessToken = null;
-			Map<String, String> headers = input.getHeaders();
-			if (headers.containsKey("Authorization")) {
-				String authHeader = headers.get("Authorization");
-				if (authHeader.startsWith("Bearer ")) {
-					accessToken = authHeader.substring("Bearer ".length());
-				}
-			}
-
-			if (accessToken == null || accessToken.isEmpty()) {
-				return new APIGatewayProxyResponseEvent().withStatusCode(403).withBody("No Authorization token detected.");
-			}
 			List<Map<String, Object>> tables = new ArrayList<>();
 
 			Map<String, Object> table1 = new HashMap<>();

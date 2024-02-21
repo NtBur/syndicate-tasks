@@ -30,9 +30,9 @@
 	    "s3:ListBucket",
 	    "cognito-idp:ListUserPools",
 	    "cognito-idp:CreateUserPool",
-            "cognito-idp:DescribeUserPool",
+        "cognito-idp:DescribeUserPool",
 	    "cognito-idp:AdminCreateUser",
-            "cognito-idp:AdminInitiateAuth",
+        "cognito-idp:AdminInitiateAuth",
 	    "cognito-idp:CreateUserPoolClient",
 	    "cognito-idp:AdminSetUserPassword",
 	    "dynamodb:DescribeTable",
@@ -62,6 +62,16 @@
   "task10_api": {
     "resource_type": "api_gateway",
     "deploy_stage": "api",
+    "authorizers":{
+      "authorizer":{
+        "type":"COGNITO_USER_POOLS",
+        "identity_source":"method.request.header.Authorization",
+        "user_pools":[
+          "simple-booking-userpool"
+        ],
+        "ttl":300
+      }
+    },
     "dependencies": [],
     "resources": {
       "/signup": {
@@ -97,7 +107,7 @@
       "/tables": {
         "enable_cors": false,
         "POST": {
-          "authorization_type": "NONE",
+          "authorization_type": "authorizer",
           "integration_type": "lambda",
           "lambda_name": "api_handler",
           "api_key_required": false,
