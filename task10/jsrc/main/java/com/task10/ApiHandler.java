@@ -90,37 +90,35 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
         try {
             validatePassword(input.get("password"));
             validateEmail(input.get("email"));
-
-            AdminCreateUserRequest adminCreateUserRequest = AdminCreateUserRequest.builder()
-                    .userPoolId(userPoolId)
-                    .messageAction("SUPPRESS")
-                    .username(input.get("email"))
-                    .temporaryPassword(input.get("password"))
-                    .userAttributes(
-                            AttributeType.builder().name("name").value(input.get("firstName")).build(),
-                            AttributeType.builder().name("family_name").value(input.get("lastName")).build(),
-                            AttributeType.builder().name("email").value(input.get("email")).build()
-                    )
-                    .build();
-
-                AdminCreateUserResponse adminCreateUserResponse = cognitoClient.adminCreateUser(adminCreateUserRequest);
-                return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody("User registered successfully");
-            } catch (UsernameExistsException e) {
-                return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Username already exists");
-            } catch (InvalidParameterException e) {
-                return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid parameter");
-            } catch (RuntimeException e) {
-                return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid password | email");
-            }
+        } catch (RuntimeException e) {
+            return new APIGatewayProxyResponseEvent().withStatusCode(400);
         }
+        AdminCreateUserRequest adminCreateUserRequest = AdminCreateUserRequest.builder()
+                .userPoolId(userPoolId)
+                .messageAction("SUPPRESS")
+                .username(input.get("email"))
+                .temporaryPassword(input.get("password"))
+                .userAttributes(
+                        AttributeType.builder().name("name").value(input.get("firstName")).build(),
+                        AttributeType.builder().name("family_name").value(input.get("lastName")).build(),
+                        AttributeType.builder().name("email").value(input.get("email")).build()
+                )
+                .build();
+        try {
+            AdminCreateUserResponse adminCreateUserResponse = cognitoClient.adminCreateUser(adminCreateUserRequest);
+            return new APIGatewayProxyResponseEvent().withStatusCode(200);
+        } catch (UsernameExistsException | InvalidParameterException e) {
+            return new APIGatewayProxyResponseEvent().withStatusCode(400);
+        }
+    }
 
     public void validateEmail(String email) {
         String EMAIL_PATTERN = "^[A-Za-z0-9+_.-]+@(.+)$";
         Pattern pattern = Pattern.compile(EMAIL_PATTERN);
         Matcher matcher = pattern.matcher(email);
-            if (!matcher.matches()) {
-                throw new RuntimeException("invalid email");
-            }
+        if (!matcher.matches()) {
+            throw new RuntimeException("invalid email");
+        }
     }
 
     public void validatePassword(String password) {
@@ -162,37 +160,38 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
         authParameters.put("PASSWORD", password);
         return authParameters;
     }
+
     private void changeTemporaryPassword(APIGatewayProxyRequestEvent inputBody) {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         Map<String, String> input = gson.fromJson(inputBody.getBody(), new TypeToken<Map<String, String>>() {
         }.getType());
-            AdminInitiateAuthResponse authResponse = cognitoClient.adminInitiateAuth(
-                    AdminInitiateAuthRequest.builder()
-                            .authFlow(AuthFlowType.ADMIN_NO_SRP_AUTH)
+        AdminInitiateAuthResponse authResponse = cognitoClient.adminInitiateAuth(
+                AdminInitiateAuthRequest.builder()
+                        .authFlow(AuthFlowType.ADMIN_NO_SRP_AUTH)
+                        .clientId(clientId)
+                        .userPoolId(userPoolId)
+                        .authParameters(buildAuthParameters(input.get("email"), input.get("password")))
+                        .build()
+        );
+
+        String challengeName = authResponse.challengeNameAsString();
+
+        if (ChallengeNameType.NEW_PASSWORD_REQUIRED.name().equals(challengeName)) {
+            RespondToAuthChallengeResponse respondToAuthChallenge = cognitoClient.respondToAuthChallenge(
+                    RespondToAuthChallengeRequest.builder()
+                            .challengeName(ChallengeNameType.NEW_PASSWORD_REQUIRED)
                             .clientId(clientId)
-                            .userPoolId(userPoolId)
-                            .authParameters(buildAuthParameters(input.get("email"), input.get("password")))
+                            .challengeResponses(new HashMap<String, String>() {
+                                {
+                                    put("USERNAME", input.get("email"));
+                                    put("NEW_PASSWORD", input.get("password"));
+                                }
+                            })
+                            .session(authResponse.session())
                             .build()
             );
-
-            String challengeName = authResponse.challengeNameAsString();
-
-            if (ChallengeNameType.NEW_PASSWORD_REQUIRED.name().equals(challengeName)) {
-                RespondToAuthChallengeResponse respondToAuthChallenge = cognitoClient.respondToAuthChallenge(
-                        RespondToAuthChallengeRequest.builder()
-                                .challengeName(ChallengeNameType.NEW_PASSWORD_REQUIRED)
-                                .clientId(clientId)
-                                .challengeResponses(new HashMap<String, String>() {
-                                    {
-                                        put("USERNAME", input.get("email"));
-                                        put("NEW_PASSWORD", input.get("password"));
-                                    }
-                                })
-                                .session(authResponse.session())
-                                .build()
-                );
-            }
         }
+    }
 
 
     private APIGatewayProxyResponseEvent handleGetTables(APIGatewayProxyRequestEvent input) {
