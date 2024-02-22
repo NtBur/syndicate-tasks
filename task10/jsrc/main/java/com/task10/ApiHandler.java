@@ -90,7 +90,7 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
 
             String validEmail = validateEmail(input.get("email"))?input.get("email"):null;
             String validPassword = validatePassword(input.get("password"))?input.get("password"):null;
-            if(validPassword==null) return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid password");
+
             AdminCreateUserRequest adminCreateUserRequest = AdminCreateUserRequest.builder()
                     .userPoolId(userPoolId)
                     .messageAction("SUPPRESS")
@@ -104,7 +104,11 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
                     .build();
         try {
             AdminCreateUserResponse adminCreateUserResponse = cognitoClient.adminCreateUser(adminCreateUserRequest);
-            return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody("User registered successfully");
+            if(validPassword==null){
+                return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid password");
+            }else {
+                return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody("User registered successfully");
+            }
         } catch (UsernameExistsException e) {
             return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Username already exists");
         }catch (InvalidParameterException e){
