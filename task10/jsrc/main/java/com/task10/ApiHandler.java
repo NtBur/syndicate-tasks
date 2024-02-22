@@ -88,27 +88,20 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
         Map<String, String> input = gson.fromJson(inputBody.getBody(), new TypeToken<Map<String, String>>() {
         }.getType());
 
-            String validEmail = validateEmail(input.get("email"))?input.get("email"):null;
-            String validPassword = validatePassword(input.get("password"))?input.get("password"):null;
-
             AdminCreateUserRequest adminCreateUserRequest = AdminCreateUserRequest.builder()
                     .userPoolId(userPoolId)
                     .messageAction("SUPPRESS")
-                    .username(validEmail)
-                    .temporaryPassword(validPassword)
+                    .username(input.get("email"))
+                    .temporaryPassword(input.get("password"))
                     .userAttributes(
                             AttributeType.builder().name("name").value(input.get("firstName")).build(),
                             AttributeType.builder().name("family_name").value(input.get("lastName")).build(),
-                            AttributeType.builder().name("email").value(validEmail).build()
+                            AttributeType.builder().name("email").value(input.get("email")).build()
                     )
                     .build();
         try {
             AdminCreateUserResponse adminCreateUserResponse = cognitoClient.adminCreateUser(adminCreateUserRequest);
-            if(validPassword==null){
-                return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid password");
-            }else {
                 return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody("User registered successfully");
-            }
         } catch (UsernameExistsException e) {
             return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Username already exists");
         }catch (InvalidParameterException e){
@@ -116,22 +109,6 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
         }catch (InvalidPasswordException e){
             return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid password");
         }
-    }
-
-    public boolean validateEmail(String email) {
-        Pattern pattern;
-        Matcher matcher;
-
-        String EMAIL_PATTERN = "^[A-Za-z0-9+_.-]+@(.+)$";
-        pattern = Pattern.compile(EMAIL_PATTERN);
-        matcher = pattern.matcher(email);
-        return matcher.matches();
-    }
-
-    public boolean validatePassword(String password) {
-        String PASSWORD_PATTERN = "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[$%^*])[A-Za-z\\d$%^*]{12,}$";
-        Pattern pattern = Pattern.compile(PASSWORD_PATTERN);
-        return pattern.matcher(password).matches();
     }
 
     private APIGatewayProxyResponseEvent handleSignin(APIGatewayProxyRequestEvent inputBody) {
@@ -151,9 +128,13 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
 
             String token = authResponse.authenticationResult().idToken();
             System.out.println("TOKEN " + token);
-            return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody(token);
-        } catch (Exception e) {
-            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Auth failed: " + e.getMessage());
+            return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody("{\"accessToken\":\"" + token + "\"}");
+        }  catch (UsernameExistsException e) {
+            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Username already exists");
+        }catch (InvalidParameterException e){
+            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid parameter");
+        }catch (InvalidPasswordException e){
+            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid password");
         }
     }
 
