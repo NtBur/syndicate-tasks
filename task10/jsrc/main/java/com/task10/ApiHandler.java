@@ -88,44 +88,46 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
         Map<String, String> input = gson.fromJson(inputBody.getBody(), new TypeToken<Map<String, String>>() {
         }.getType());
         try {
-            validatePassword(input.get("password"));
-            validateEmail(input.get("email"));
-        } catch (RuntimeException e) {
-            return new APIGatewayProxyResponseEvent().withStatusCode(400);
-        }
-        AdminCreateUserRequest adminCreateUserRequest = AdminCreateUserRequest.builder()
-                .userPoolId(userPoolId)
-                .messageAction("SUPPRESS")
-                .username(input.get("email"))
-                .temporaryPassword(input.get("password"))
-                .userAttributes(
-                        AttributeType.builder().name("name").value(input.get("firstName")).build(),
-                        AttributeType.builder().name("family_name").value(input.get("lastName")).build(),
-                        AttributeType.builder().name("email").value(input.get("email")).build()
-                )
-                .build();
-        try {
+            String validPassword = validatePassword(input.get("password"));
+            String validEmail = validateEmail(input.get("email"));
+
+            AdminCreateUserRequest adminCreateUserRequest = AdminCreateUserRequest.builder()
+                    .userPoolId(userPoolId)
+                    .messageAction("SUPPRESS")
+                    .username(validEmail)
+                    .temporaryPassword(validPassword)
+                    .userAttributes(
+                            AttributeType.builder().name("name").value(input.get("firstName")).build(),
+                            AttributeType.builder().name("family_name").value(input.get("lastName")).build(),
+                            AttributeType.builder().name("email").value(validEmail).build()
+                    )
+                    .build();
+
             AdminCreateUserResponse adminCreateUserResponse = cognitoClient.adminCreateUser(adminCreateUserRequest);
             return new APIGatewayProxyResponseEvent().withStatusCode(200);
-        } catch (UsernameExistsException | InvalidParameterException e) {
+        } catch (RuntimeException e) {
             return new APIGatewayProxyResponseEvent().withStatusCode(400);
         }
     }
 
-    public void validateEmail(String email) {
+    public String validateEmail(String email) {
         String EMAIL_PATTERN = "^[A-Za-z0-9+_.-]+@(.+)$";
         Pattern pattern = Pattern.compile(EMAIL_PATTERN);
         Matcher matcher = pattern.matcher(email);
-        if (!matcher.matches()) {
+        if (matcher.matches()) {
+            return email;
+        } else {
             throw new RuntimeException("invalid email");
         }
     }
 
-    public void validatePassword(String password) {
+    public String validatePassword(String password) {
         String PASSWORD_PATTERN = "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[$%^*])[A-Za-z\\d$%^*]{12,}$";
         Pattern pattern = Pattern.compile(PASSWORD_PATTERN);
         Matcher matcher = pattern.matcher(password);
-        if (!matcher.matches()) {
+        if (matcher.matches()) {
+            return password;
+        } else {
             throw new RuntimeException("invalid password");
         }
     }
