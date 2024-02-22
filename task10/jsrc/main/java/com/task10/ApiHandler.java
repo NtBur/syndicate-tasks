@@ -87,9 +87,9 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         Map<String, String> input = gson.fromJson(inputBody.getBody(), new TypeToken<Map<String, String>>() {
         }.getType());
-        try {
-            String validPassword = validatePassword(input.get("password"));
-            String validEmail = validateEmail(input.get("email"));
+
+            String validEmail = validateEmail(input.get("email"))?input.get("email"):null;
+            String validPassword = validatePassword(input.get("password"))?input.get("password"):null;
 
             AdminCreateUserRequest adminCreateUserRequest = AdminCreateUserRequest.builder()
                     .userPoolId(userPoolId)
@@ -102,34 +102,32 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
                             AttributeType.builder().name("email").value(validEmail).build()
                     )
                     .build();
-
+        try {
             AdminCreateUserResponse adminCreateUserResponse = cognitoClient.adminCreateUser(adminCreateUserRequest);
-            return new APIGatewayProxyResponseEvent().withStatusCode(200);
-        } catch (RuntimeException e) {
-            return new APIGatewayProxyResponseEvent().withStatusCode(400);
+            return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody("User registered successfully");
+        } catch (UsernameExistsException e) {
+            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Username already exists");
+        }catch (InvalidParameterException e){
+            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid parameter");
+        }catch (InvalidPasswordException e){
+            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid password");
         }
     }
 
-    public String validateEmail(String email) {
+    public boolean validateEmail(String email) {
+        Pattern pattern;
+        Matcher matcher;
+
         String EMAIL_PATTERN = "^[A-Za-z0-9+_.-]+@(.+)$";
-        Pattern pattern = Pattern.compile(EMAIL_PATTERN);
-        Matcher matcher = pattern.matcher(email);
-        if (matcher.matches()) {
-            return email;
-        } else {
-            throw new RuntimeException("invalid email");
-        }
+        pattern = Pattern.compile(EMAIL_PATTERN);
+        matcher = pattern.matcher(email);
+        return matcher.matches();
     }
 
-    public String validatePassword(String password) {
+    public boolean validatePassword(String password) {
         String PASSWORD_PATTERN = "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[$%^*])[A-Za-z\\d$%^*]{12,}$";
         Pattern pattern = Pattern.compile(PASSWORD_PATTERN);
-        Matcher matcher = pattern.matcher(password);
-        if (matcher.matches()) {
-            return password;
-        } else {
-            throw new RuntimeException("invalid password");
-        }
+        return pattern.matcher(password).matches();
     }
 
     private APIGatewayProxyResponseEvent handleSignin(APIGatewayProxyRequestEvent inputBody) {
