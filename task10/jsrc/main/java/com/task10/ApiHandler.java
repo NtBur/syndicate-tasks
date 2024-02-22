@@ -90,7 +90,7 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
 
             String validEmail = validateEmail(input.get("email"))?input.get("email"):null;
             String validPassword = validatePassword(input.get("password"))?input.get("password"):null;
-
+            if(validPassword==null) return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid password");
             AdminCreateUserRequest adminCreateUserRequest = AdminCreateUserRequest.builder()
                     .userPoolId(userPoolId)
                     .messageAction("SUPPRESS")
@@ -147,7 +147,7 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
 
             String token = authResponse.authenticationResult().idToken();
             System.out.println("TOKEN " + token);
-            return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody("{\"accessToken\":\"" + token + "\"}");
+            return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody(token);
         } catch (Exception e) {
             return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Auth failed: " + e.getMessage());
         }
