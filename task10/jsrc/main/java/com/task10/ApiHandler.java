@@ -22,10 +22,7 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.*;
 
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -56,6 +53,8 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
             return handleSignup(event);
         } else if ("/signin".equals(event.getResource()) && "POST".equals(event.getHttpMethod())) {
             return handleSignin(event);
+        } else if ("/tables".equals(event.getResource()) && "GET".equals(event.getHttpMethod())) {
+            return handleGetTables(event);
         }
         return new APIGatewayProxyResponseEvent()
                 .withStatusCode(400)
@@ -88,35 +87,36 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
         Map<String, String> input = gson.fromJson(inputBody.getBody(), new TypeToken<Map<String, String>>() {
         }.getType());
 
-            AdminCreateUserRequest adminCreateUserRequest = AdminCreateUserRequest.builder()
-                    .userPoolId(userPoolId)
-                    .messageAction("SUPPRESS")
-                    .username(input.get("email"))
-                    .temporaryPassword(input.get("password"))
-                    .userAttributes(
-                            AttributeType.builder().name("name").value(input.get("firstName")).build(),
-                            AttributeType.builder().name("family_name").value(input.get("lastName")).build(),
-                            AttributeType.builder().name("email").value(input.get("email")).build()
-                    )
-                    .build();
+        AdminCreateUserRequest adminCreateUserRequest = AdminCreateUserRequest.builder()
+                .userPoolId(userPoolId)
+                .messageAction("SUPPRESS")
+                .username(input.get("email"))
+                .temporaryPassword(input.get("password"))
+                .userAttributes(
+                        AttributeType.builder().name("name").value(input.get("firstName")).build(),
+                        AttributeType.builder().name("family_name").value(input.get("lastName")).build(),
+                        AttributeType.builder().name("email").value(input.get("email")).build()
+                )
+                .build();
         try {
             AdminCreateUserResponse adminCreateUserResponse = cognitoClient.adminCreateUser(adminCreateUserRequest);
-                return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody("User registered successfully");
+            return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody("User registered successfully");
         } catch (UsernameExistsException e) {
             return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Username already exists");
-        }catch (InvalidParameterException e){
+        } catch (InvalidParameterException e) {
             return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid parameter");
-        }catch (InvalidPasswordException e){
+        } catch (InvalidPasswordException e) {
             return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid password");
         }
     }
 
     private APIGatewayProxyResponseEvent handleSignin(APIGatewayProxyRequestEvent inputBody) {
-        changeTemporaryPassword(inputBody);
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        Map<String, String> input = gson.fromJson(inputBody.getBody(), new TypeToken<Map<String, String>>() {
-        }.getType());
         try {
+            changeTemporaryPassword(inputBody);
+            Gson gson = new GsonBuilder().setPrettyPrinting().create();
+            Map<String, String> input = gson.fromJson(inputBody.getBody(), new TypeToken<Map<String, String>>() {
+            }.getType());
+
             AdminInitiateAuthResponse authResponse = cognitoClient.adminInitiateAuth(
                     AdminInitiateAuthRequest.builder()
                             .authFlow(AuthFlowType.ADMIN_NO_SRP_AUTH)
@@ -129,15 +129,22 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
             String token = authResponse.authenticationResult().idToken();
             System.out.println("TOKEN " + token);
             return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody("{\"accessToken\":\"" + token + "\"}");
-        }  catch (UsernameExistsException e) {
+        } catch (UsernameExistsException e) {
             return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Username already exists");
-        }catch (InvalidParameterException e){
+        } catch (InvalidParameterException e) {
             return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid parameter");
-        }catch (InvalidPasswordException e){
+        } catch (InvalidPasswordException e) {
             return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid password");
+        } catch (InvalidEmailRoleAccessPolicyException e) {
+            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid email");
+        } catch (InvalidLambdaResponseException e) {
+            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid lambda response");
+        } catch (InvalidOAuthFlowException e) {
+            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid AuthFlow");
+        } catch (InvalidUserPoolConfigurationException e) {
+            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid UserPoolConfiguration");
         }
     }
-
 
     private Map<String, String> buildAuthParameters(String username, String password) {
         Map<String, String> authParameters = new HashMap<>();
@@ -178,31 +185,53 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
         }
     }
 
+    private APIGatewayProxyResponseEvent handleGetTables(APIGatewayProxyRequestEvent inputBody) {
+        try {
+           String token = inputBody.getHeaders().get("Authorization");
+            GetUserRequest getUserRequest = GetUserRequest.builder().accessToken(token).build();
+            cognitoClient.getUser(getUserRequest);
 
-    private APIGatewayProxyResponseEvent handleGetTables(APIGatewayProxyRequestEvent input) {
+            List<Map<String, Object>> tables = getTables();
+
+            Map<String, Object> response = Collections.singletonMap("tables", tables);
+            return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody(response.toString());
+        } catch (NotAuthorizedException ex) {
+            return new APIGatewayProxyResponseEvent().withStatusCode(401).withBody("Not authorized");
+        } catch (ResourceNotFoundException ex) {
+            return new APIGatewayProxyResponseEvent().withStatusCode(404).withBody("User not found");
+        } catch (CognitoIdentityProviderException ex) {
+            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody(ex.getMessage());
+        } catch (Exception ex) {
+            return new APIGatewayProxyResponseEvent().withStatusCode(500).withBody("Internal server error");
+        }
+    }
+
+    private List<Map<String, Object>> getTables() {
         List<Map<String, Object>> tables = new ArrayList<>();
-
         Map<String, Object> table1 = new HashMap<>();
-        table1.put("id", 1);
-        table1.put("number", 10);
-        table1.put("places", 4);
-        table1.put("isVip", false);
-        table1.put("minOrder", 20);
+        table1.put("id", 15728);
+        table1.put("number", 1);
+        table1.put("places", 8);
+        table1.put("isVip", true);
+        table1.put("minOrder", 1000);
         tables.add(table1);
 
         Map<String, Object> table2 = new HashMap<>();
-        table2.put("id", 2);
-        table2.put("number", 20);
-        table2.put("places", 2);
-        table2.put("isVip", true);
+        table2.put("id", 15729);
+        table2.put("number", 2);
+        table2.put("places", 6);
+        table2.put("isVip", false);
+        table2.put("minOrder", 500);
         tables.add(table2);
 
-        Map<String, List<Map<String, Object>>> response = new HashMap<>();
-        response.put("tables", tables);
+        Map<String, Object> table3 = new HashMap<>();
+        table3.put("id", 15730);
+        table3.put("number", 3);
+        table3.put("places", 10);
+        table3.put("isVip", false);
+        table3.put("minOrder", 800);
+        tables.add(table3);
 
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        String json = gson.toJson(response);
-        return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody(json);
+        return tables;
     }
-
 }

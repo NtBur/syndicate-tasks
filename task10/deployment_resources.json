@@ -38,6 +38,8 @@
             "cognito-idp:ListUserPoolClients",
 	    "cognito-idp:InitiateAuth",
             "cognito-idp:RespondToAuthChallenge",
+            "cognito-idp:AdminGetUser",
+	    "cognito-idp:GetUser",
 	    "dynamodb:DescribeTable",
 	    "dynamodb:CreateTable",
 	    "dynamodb:UpdateTable",
@@ -65,14 +67,14 @@
   "task10_api": {
     "resource_type": "api_gateway",
     "deploy_stage": "api",
-    "authorizers":{
-      "authorizer":{
-        "type":"COGNITO_USER_POOLS",
-        "identity_source":"method.request.header.Authorization",
-        "user_pools":[
-          "simple-booking-userpool"
+    "authorizers": {
+      "authorizer": {
+        "type": "COGNITO_USER_POOLS",
+        "identity_source": "method.request.header.Authorization",
+        "user_pools": [
+          "${booking_userpool}"
         ],
-        "ttl":300
+        "ttl": 300
       }
     },
     "dependencies": [],
