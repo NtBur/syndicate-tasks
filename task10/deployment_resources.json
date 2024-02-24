@@ -43,6 +43,7 @@
 	    "dynamodb:DescribeTable",
 	    "dynamodb:CreateTable",
 	    "dynamodb:UpdateTable",
+	    "dynamodb:Scan",
             "apigateway:*"
           ],
           "Effect": "Allow",
@@ -124,7 +125,21 @@
           "enable_proxy": true
         },
         "GET": {
-          "authorization_type": "NONE",
+          "authorization_type": "authorizer",
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "api_key_required": false,
+          "method_request_parameters": {},
+          "integration_request_body_template": {},
+          "responses": [],
+          "integration_responses": [],
+          "default_error_pattern": true,
+	  "enable_proxy": true
+        }
+      },
+   "/tables/{tableId}": {
+	"GET": {
+          "authorization_type": "authorizer",
           "integration_type": "lambda",
           "lambda_name": "api_handler",
           "api_key_required": false,
@@ -139,7 +154,7 @@
       "/reservations": {
         "enable_cors": false,
         "POST": {
-          "authorization_type": "NONE",
+          "authorization_type": "authorizer",
           "integration_type": "lambda",
           "lambda_name": "api_handler",
           "api_key_required": false,
@@ -151,7 +166,7 @@
           "enable_proxy": true
         },
         "GET": {
-          "authorization_type": "NONE",
+          "authorization_type": "authorizer",
           "integration_type": "lambda",
           "lambda_name": "api_handler",
           "api_key_required": false,

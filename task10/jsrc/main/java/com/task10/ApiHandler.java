@@ -1,10 +1,13 @@
 package com.task10;
 
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.model.*;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
-import com.amazonaws.services.lambda.runtime.events.CloudFrontEvent;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -14,17 +17,12 @@ import com.syndicate.deployment.annotations.environment.EnvironmentVariables;
 import com.syndicate.deployment.annotations.lambda.LambdaHandler;
 import com.syndicate.deployment.model.lambda.url.AuthType;
 import com.syndicate.deployment.model.lambda.url.InvokeMode;
-
-import software.amazon.awssdk.core.Response;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityProviderClient;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.*;
 
-
-import java.io.IOException;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+
 
 @LambdaHandler(lambdaName = "api_handler",
         roleName = "api_handler-role"
@@ -46,41 +44,32 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
     CognitoClient client = new CognitoClient();
     private String userPoolId = client.getUserPoolId(cognitoClient, System.getenv("booking_userpool"));
     private String clientId = client.getClientId(cognitoClient, userPoolId);
+    private AmazonDynamoDB amazonDynamoDB;
 
 
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent event, Context context) {
+        this.initDynamoDbClient();
+
         if ("/signup".equals(event.getResource()) && "POST".equals(event.getHttpMethod())) {
             return handleSignup(event);
         } else if ("/signin".equals(event.getResource()) && "POST".equals(event.getHttpMethod())) {
             return handleSignin(event);
         } else if ("/tables".equals(event.getResource()) && "GET".equals(event.getHttpMethod())) {
-            return handleGetTables(event);
+            return handleGetTables();
+        } else if ("/tables".equals(event.getResource()) && "POST".equals(event.getHttpMethod())) {
+            return handlePostTables(event);
+        } else if ("/tables/{tableId}".equals(event.getResource()) && "GET".equals(event.getHttpMethod())) {
+            return handleGetTableById(event);
+        } else if ("/reservations".equals(event.getResource()) && "POST".equals(event.getHttpMethod())) {
+            return handlePostReservations(event);
+        } else if ("/reservations".equals(event.getResource()) && "GET".equals(event.getHttpMethod())) {
+            return handleGetReservations();
         }
+
         return new APIGatewayProxyResponseEvent()
                 .withStatusCode(400)
                 .withBody("Invalid resource or method.");
     }
-
-		/*	String path = input.getPath();
-
-			switch (path) {
-				case "/signup":
-					return handleSignup(input);
-				case "/signin":
-					return handleSignin(input);
-				case "/tables":
-					String httpMethod = input.getHttpMethod();
-					if ("GET".equalsIgnoreCase(httpMethod)) {
-						return handleGetTables(input);
-					} else if ("POST".equalsIgnoreCase(httpMethod)) {
-						//return handlePostTables(input);
-					}
-					break;
-				case "/tables/{tableId}":
-					//	return handleGetTable(input);
-			}
-			return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid request");*/
-    //	}
 
     private APIGatewayProxyResponseEvent handleSignup(APIGatewayProxyRequestEvent inputBody) {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
@@ -143,6 +132,9 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
             return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid AuthFlow");
         } catch (InvalidUserPoolConfigurationException e) {
             return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid UserPoolConfiguration");
+        } catch (EnableSoftwareTokenMfaException | SoftwareTokenMfaNotFoundException |
+                 UnsupportedTokenTypeException e) {
+            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Invalid Token");
         }
     }
 
@@ -185,53 +177,170 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
         }
     }
 
-    private APIGatewayProxyResponseEvent handleGetTables(APIGatewayProxyRequestEvent inputBody) {
+    private APIGatewayProxyResponseEvent handleGetTables() {
+
         try {
-           String token = inputBody.getHeaders().get("Authorization");
-            GetUserRequest getUserRequest = GetUserRequest.builder().accessToken(token).build();
-            cognitoClient.getUser(getUserRequest);
+            ScanRequest scanRequest = new ScanRequest().withTableName(System.getenv("tables_table"));
+            ScanResult scanResult = amazonDynamoDB.scan(scanRequest);
+            List<Map<String, Object>> tables = new ArrayList<>();
+            for (Map<String, AttributeValue> item : scanResult.getItems()) {
+                Map<String, Object> table = new HashMap<>();
+                table.put("id", Integer.parseInt(item.get("id").getN()));
+                table.put("number", Integer.parseInt(item.get("number").getN()));
+                table.put("places", Integer.parseInt(item.get("places").getN()));
+                table.put("isVip", Boolean.parseBoolean(item.get("isVip").getBOOL().toString()));
 
-            List<Map<String, Object>> tables = getTables();
+                if (item.containsKey("minOrder")) {
+                    table.put("minOrder", Integer.parseInt(item.get("minOrder").getN()));
+                }
+                tables.add(table);
+            }
 
-            Map<String, Object> response = Collections.singletonMap("tables", tables);
-            return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody(response.toString());
+            Map<String, List<Map<String, Object>>> responseBody = new HashMap<>();
+            responseBody.put("tables", tables);
+
+            return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody(responseBody.toString());
         } catch (NotAuthorizedException ex) {
-            return new APIGatewayProxyResponseEvent().withStatusCode(401).withBody("Not authorized");
-        } catch (ResourceNotFoundException ex) {
-            return new APIGatewayProxyResponseEvent().withStatusCode(404).withBody("User not found");
-        } catch (CognitoIdentityProviderException ex) {
-            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody(ex.getMessage());
-        } catch (Exception ex) {
-            return new APIGatewayProxyResponseEvent().withStatusCode(500).withBody("Internal server error");
+            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Not authorized");
+        } catch (Exception e) {
+            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody(e.getMessage());
         }
     }
 
-    private List<Map<String, Object>> getTables() {
-        List<Map<String, Object>> tables = new ArrayList<>();
-        Map<String, Object> table1 = new HashMap<>();
-        table1.put("id", 15728);
-        table1.put("number", 1);
-        table1.put("places", 8);
-        table1.put("isVip", true);
-        table1.put("minOrder", 1000);
-        tables.add(table1);
+    private APIGatewayProxyResponseEvent handlePostTables(APIGatewayProxyRequestEvent inputBody) throws ConditionalCheckFailedException {
+        try {
+            Gson gson = new GsonBuilder().setPrettyPrinting().create();
+            Map<String, String> input = gson.fromJson(inputBody.getBody(), new TypeToken<Map<String, String>>() {
+            }.getType());
+            Map<String, AttributeValue> attributesMap = new HashMap<>();
 
-        Map<String, Object> table2 = new HashMap<>();
-        table2.put("id", 15729);
-        table2.put("number", 2);
-        table2.put("places", 6);
-        table2.put("isVip", false);
-        table2.put("minOrder", 500);
-        tables.add(table2);
+            String id = input.get("id");
+            attributesMap.put("id", new AttributeValue().withN(id));
+            attributesMap.put("number", new AttributeValue().withN(String.valueOf(input.get("number"))));
+            attributesMap.put("places", new AttributeValue().withN(String.valueOf(input.get("places"))));
+            attributesMap.put("isVip", new AttributeValue().withBOOL(Boolean.valueOf((input.get("isVip")))));
+            if (input.containsKey("minOrder")) {
+                String minOrder = String.valueOf(input.get("minOrder"));
+                attributesMap.put("minOrder", new AttributeValue().withN(minOrder));
+            }
+            amazonDynamoDB.putItem(System.getenv("tables_table"), attributesMap);
+            return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody("{\"id\":\"" + id + "\"}");
+        } catch (Exception e) {
+            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("{\"Invalid input\":\"" + e.getMessage() + "\"}");
+        }
+    }
 
-        Map<String, Object> table3 = new HashMap<>();
-        table3.put("id", 15730);
-        table3.put("number", 3);
-        table3.put("places", 10);
-        table3.put("isVip", false);
-        table3.put("minOrder", 800);
-        tables.add(table3);
+    private void initDynamoDbClient() {
+        this.amazonDynamoDB = AmazonDynamoDBClientBuilder.standard()
+                .withRegion(System.getenv("region"))
+                .build();
+    }
 
-        return tables;
+    public APIGatewayProxyResponseEvent handleGetTableById(APIGatewayProxyRequestEvent event) {
+        try {
+            String tableId = event.getPathParameters().get("tableId");
+
+            Map<String, AttributeValue> item = getItemFromDynamoDB(tableId);
+
+            Map<String, Object> responseBody = new HashMap<>();
+            responseBody.put("id", Integer.parseInt(item.get("id").getN()));
+            responseBody.put("number", Integer.parseInt(item.get("number").getN()));
+            responseBody.put("places", Integer.parseInt(item.get("places").getN()));
+            responseBody.put("isVip", Boolean.parseBoolean(item.get("isVip").getBOOL().toString()));
+
+            if (item.containsKey("minOrder")) {
+                responseBody.put("minOrder", Integer.parseInt(item.get("minOrder").getN()));
+            }
+
+            return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody(responseBody.toString());
+
+        } catch (Exception e) {
+            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody(e.getMessage());
+        }
+    }
+
+    private Map<String, AttributeValue> getItemFromDynamoDB(String tableId) {
+        Map<String, AttributeValue> key = new HashMap<>();
+        key.put("id", new AttributeValue().withN(tableId));
+
+        return amazonDynamoDB.getItem(System.getenv("tables_table"), key).getItem();
+    }
+
+    public APIGatewayProxyResponseEvent handlePostReservations(APIGatewayProxyRequestEvent inputBody) {
+        try {
+            Gson gson = new GsonBuilder().setPrettyPrinting().create();
+            Map<String, String> input = gson.fromJson(inputBody.getBody(), new TypeToken<Map<String, String>>() {
+            }.getType());
+            int tableNumber = Integer.parseInt(input.get("tableNumber"));
+            if (tableNumberExists(tableNumber)) {
+                String reservationId = String.valueOf(UUID.randomUUID());
+
+                Map<String, AttributeValue> reservationItem = new HashMap<>();
+                reservationItem.put("id", new AttributeValue(reservationId));
+                reservationItem.put("tableNumber", new AttributeValue().withN(String.valueOf(tableNumber)));
+                reservationItem.put("clientName", new AttributeValue().withS(String.valueOf(input.get("clientName"))));
+                reservationItem.put("phoneNumber", new AttributeValue().withS(String.valueOf(input.get("phoneNumber"))));
+                reservationItem.put("date", new AttributeValue().withS(String.valueOf(input.get("date"))));
+                reservationItem.put("slotTimeStart", new AttributeValue().withS(String.valueOf(input.get("slotTimeStart"))));
+                reservationItem.put("slotTimeEnd", new AttributeValue().withS(String.valueOf(input.get("slotTimeEnd"))));
+
+                amazonDynamoDB.putItem(System.getenv("reservations_table"), reservationItem);
+                return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody("{\"reservationId\": \"" + reservationId + "\"}");
+            } else {
+                throw new TableNumberNotFoundException("Table number '" + tableNumber + "' not found.");
+            }
+
+        } catch (TableNumberNotFoundException e) {
+            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("reservation can't be created");
+        } catch (Exception e) {
+            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody(e.getMessage());
+        }
+    }
+
+    private boolean tableNumberExists(int tableNumber) {
+        String tableNumberString = String.valueOf(tableNumber);
+        ScanRequest scanRequest = new ScanRequest().withTableName(System.getenv("tables_table"));
+        ScanResult scanResult = amazonDynamoDB.scan(scanRequest);
+        for (Map<String, AttributeValue> item : scanResult.getItems()) {
+            if (item.containsKey("number")) {
+                if (item.get("number").getN().equals(tableNumberString)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static class TableNumberNotFoundException extends Exception {
+        public TableNumberNotFoundException(String message) {
+            super(message);
+        }
+    }
+
+    public APIGatewayProxyResponseEvent handleGetReservations() {
+        try {
+            ScanRequest scanRequest = new ScanRequest().withTableName(System.getenv("reservations_table"));
+            ScanResult scanResult = amazonDynamoDB.scan(scanRequest);
+            List<Map<String, Object>> reservations = new ArrayList<>();
+            for (Map<String, AttributeValue> item : scanResult.getItems()) {
+                Map<String, Object> reservation = new HashMap<>();
+                reservation.put("tableNumber", Integer.parseInt(item.get("tableNumber").getN()));
+                reservation.put("clientName", item.get("clientName").getS());
+                reservation.put("phoneNumber", item.get("phoneNumber").getS());
+                reservation.put("date", item.get("date").getS());
+                reservation.put("slotTimeStart", item.get("slotTimeStart").getS());
+                reservation.put("slotTimeEnd", item.get("slotTimeEnd").getS());
+
+                reservations.add(reservation);
+            }
+            Map<String, List<Map<String, Object>>> responseBody = new HashMap<>();
+            responseBody.put("reservations", reservations);
+
+            return new APIGatewayProxyResponseEvent().withStatusCode(200).withBody(responseBody.toString());
+        } catch (NotAuthorizedException ex) {
+            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody("Not authorized");
+        } catch (Exception e) {
+            return new APIGatewayProxyResponseEvent().withStatusCode(400).withBody(e.getMessage());
+        }
     }
 }
